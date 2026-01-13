@@ -212,14 +212,15 @@ def generate_frames():
                     face_status = "Away" if face_away else "Facing Screen"
                     gaze_status = "Away" if look_away else "Center"
 
-                    # Emit status update
+                    # Emit status update with immediate audio alerts
                     socketio.emit('update', {
                         'status': status,
                         'focus_score': focus_score,
                         'eye_status': eye_status,
                         'face_status': face_status,
                         'gaze_status': gaze_status,
-                        'alarm': 'ALARM' in status
+                        'alarm': 'ALARM' in status,
+                        'play_sound': 'ALARM' in status  # Immediate browser beep
                     })
             else:
                 # No faces detected

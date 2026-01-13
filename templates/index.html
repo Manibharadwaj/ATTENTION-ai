@@ -438,12 +438,48 @@
             if (data.alarm) {
                 statusEl.classList.add('alarm');
                 alarmAudio.play().catch(e => console.log('Audio play failed:', e));
+
+                // Immediate browser beep for all alarm conditions
+                if (data.play_sound) {
+                    playBrowserBeep();
+                }
             } else {
                 statusEl.classList.remove('alarm');
                 alarmAudio.pause();
                 alarmAudio.currentTime = 0;
             }
         });
+
+        // Browser-based beep function
+        function playBrowserBeep() {
+            try {
+                // Create audio context
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+                // Create oscillator for beep sound
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                // Connect nodes
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                // Configure beep sound (800Hz, 0.3 seconds)
+                oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+                oscillator.type = 'sine';
+
+                // Configure volume envelope
+                gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+                // Play beep
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.3);
+            } catch (e) {
+                console.log('Browser beep failed:', e);
+            }
+        }
 
         socket.on('status', function(data) {
             startBtn.disabled = data.monitoring;
