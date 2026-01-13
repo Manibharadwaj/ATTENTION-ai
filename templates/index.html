@@ -6,122 +6,410 @@
     <title>Study Guard 👁️</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #6b73ff 0%, #8b5cf6 100%);
+            min-height: 100vh;
+        }
+
+        /* Navigation */
+        .navbar {
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(15px);
+            box-shadow: 0 2px 25px rgba(0, 0, 0, 0.08);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            border-bottom: 1px solid rgba(107, 115, 255, 0.1);
+        }
+
+        .nav-container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
             display: flex;
-            gap: 20px;
-            align-items: start;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.8rem 2rem;
         }
-        .video-section {
-            flex: 1;
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #6b73ff;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
-        .controls-section {
-            flex: 1;
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+
+        .logo-text {
+            background: linear-gradient(135deg, #6b73ff 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
+
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 1.5rem;
+            margin: 0;
+            padding: 0;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: #555;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            padding: 0.6rem 1.2rem;
+            border-radius: 25px;
+            position: relative;
+        }
+
+        .nav-links a:hover {
+            color: #6b73ff;
+            background: rgba(107, 115, 255, 0.08);
+            transform: translateY(-1px);
+        }
+
+        .nav-links a:active {
+            transform: translateY(0);
+        }
+
+        /* Main Content */
+        .main-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 6rem 2rem 2rem; /* Added top padding to account for fixed navbar */
+        }
+
+        .hero {
+            text-align: center;
+            color: white;
+            margin-bottom: 3rem;
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .video-section, .controls-section {
+            background: #fff;
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #6b73ff;
+            border-bottom: 2px solid #6b73ff;
+            padding-bottom: 0.5rem;
+        }
+
         .status-display {
             background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 10px 0;
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin: 1rem 0;
+            border: 1px solid rgba(107, 115, 255, 0.1);
         }
+
         .status-item {
-            margin: 8px 0;
-            padding: 5px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 1rem 0;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
         }
-        .alarm {
-            color: #dc3545;
+
+        .status-item:last-child {
+            border-bottom: none;
+        }
+
+        .status-label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        .status-value {
             font-weight: bold;
+            color: #333;
+        }
+
+        .alarm {
+            color: #dc3545 !important;
             animation: blink 1s infinite;
         }
+
         @keyframes blink {
             0%, 50% { opacity: 1; }
             51%, 100% { opacity: 0.5; }
         }
+
         .focus-score {
-            font-size: 24px;
+            font-size: 2rem;
             font-weight: bold;
             color: #28a745;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
         }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
         button {
-            background: #007bff;
+            background: linear-gradient(135deg, #6b73ff 0%, #8b5cf6 100%);
             color: white;
             border: none;
             padding: 12px 24px;
-            border-radius: 5px;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 16px;
-            margin: 5px;
+            font-weight: 600;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            flex: 1;
         }
+
         button:hover {
-            background: #0056b3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(107, 115, 255, 0.4);
         }
+
         button:disabled {
             background: #6c757d;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
+
         .video-container {
-            background: black;
+            background: #000;
             border-radius: 10px;
             overflow: hidden;
             position: relative;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.3);
         }
+
         img {
             width: 100%;
             display: block;
+            border-radius: 10px;
         }
-        .title {
+
+        /* Footer */
+        .footer {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            margin-top: 3rem;
+            padding: 2rem 0;
+            border-top: 1px solid rgba(107, 115, 255, 0.2);
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+        }
+
+        .footer-section h3 {
+            color: #6b73ff;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+        }
+
+        .footer-section p, .footer-section a {
+            color: #666;
+            text-decoration: none;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .footer-section a:hover {
+            color: #6b73ff;
+        }
+
+        .social-links {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .social-links a {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            background: #6b73ff;
+            color: white;
             text-align: center;
-            color: #333;
-            margin-bottom: 20px;
+            line-height: 40px;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
         }
+
+        .social-links a:hover {
+            transform: scale(1.1);
+        }
+
+        .copyright {
+            text-align: center;
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+            color: #888;
+        }
+
         audio {
             display: none;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .nav-container {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .nav-links {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .hero h1 {
+                font-size: 2rem;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <span class="logo-text">Study Guard</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="/">Home</a></li>
+                <li><a href="/about">About</a></li>
+                <li><a href="/contact">Contact</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="hero">
+            <h1>AI-Powered Focus Monitor</h1>
+            <p>Keep your study sessions productive with real-time attention tracking</p>
+        </div>
+
+        <div class="container">
+            <div class="video-section">
+                <h2 class="section-title">Live Camera Feed</h2>
+                <div class="video-container">
+                    <img id="video-feed" src="" alt="Video Feed">
+                </div>
+            </div>
+
+            <div class="controls-section">
+                <h2 class="section-title">Focus Dashboard</h2>
+                <div class="status-display">
+                    <div class="status-item">
+                        <span class="status-label">Status:</span>
+                        <span class="status-value" id="status">Initializing...</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Focus Score:</span>
+                        <span class="status-value focus-score" id="focus-score">100%</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Eyes:</span>
+                        <span class="status-value" id="eye-status">Open</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Face:</span>
+                        <span class="status-value" id="face-status">Facing Screen</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Gaze:</span>
+                        <span class="status-value" id="gaze-status">Center</span>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button id="start-btn">Start Monitoring</button>
+                    <button id="stop-btn" disabled>Stop Monitoring</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3>Study Guard</h3>
+                <p>AI-powered focus monitoring to help you stay productive during study sessions.</p>
+            </div>
+            <div class="footer-section">
+                <h3>Quick Links</h3>
+                <a href="/">Home</a>
+                <a href="/about">About</a>
+                <a href="/contact">Contact</a>
+            </div>
+            <div class="footer-section">
+                <h3>Connect</h3>
+                <p>Email: manibharadwaj@gmail.com</p>
+                <div class="social-links">
+                    <a href="#" title="GitHub">🐙</a>
+                    <a href="#" title="LinkedIn">💼</a>
+                    <a href="#" title="Twitter">🐦</a>
+                </div>
+            </div>
+        </div>
+        <div class="copyright">
+            <p>&copy; 2024 Study Guard. Built with AI and ❤️ for better productivity.</p>
+        </div>
+    </footer>
+
     <audio id="alarm-audio" loop>
         <source src="{{ url_for('static', filename='alarm.wav') }}" type="audio/wav">
     </audio>
-    <h1 class="title">Study Guard 👁️</h1>
-    <div class="container">
-        <div class="video-section">
-            <div class="video-container">
-                <img id="video-feed" src="" alt="Video Feed">
-            </div>
-        </div>
-        <div class="controls-section">
-            <div class="status-display">
-                <div class="status-item">
-                    <strong>Status:</strong> <span id="status">Initializing...</span>
-                </div>
-                <div class="status-item">
-                    <strong>Focus Score:</strong> <span id="focus-score" class="focus-score">100%</span>
-                </div>
-                <div class="status-item">
-                    <strong>Eyes:</strong> <span id="eye-status">Open</span>
-                </div>
-                <div class="status-item">
-                    <strong>Face:</strong> <span id="face-status">Facing Screen</span>
-                </div>
-                <div class="status-item">
-                    <strong>Gaze:</strong> <span id="gaze-status">Center</span>
-                </div>
-            </div>
-            <button id="start-btn">Start Monitoring</button>
-            <button id="stop-btn" disabled>Stop Monitoring</button>
-        </div>
-    </div>
 
     <script>
         const socket = io();

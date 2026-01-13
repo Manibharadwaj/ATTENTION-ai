@@ -104,94 +104,108 @@ RIGHT_EYE = [362, 385, 387, 263, 373, 380]
 def generate_frames():
     global eye_closed_start, face_away_start, look_away_start, total_time, attentive_time, eye_closure_count, look_away_count, monitoring
 
-    start_time = time.time()
-
-    while monitoring:
+    while True:  # Always keep the stream alive
         ret, frame = cap.read()
         if not ret:
-            break
+            # Create a placeholder frame when camera is not available
+            frame = np.zeros((480, 640, 3), dtype=np.uint8)
+            cv2.putText(frame, "Camera not available", (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
-        current_time = time.time()
-        total_time = current_time - start_time
+        if monitoring:
+            current_time = time.time()
 
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        result = face_mesh.process(rgb)
+            # Only process frames when monitoring is active
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            result = face_mesh.process(rgb)
 
-        eye_closed = False
-        face_away = False
-        look_away = False
-        status = "Monitoring..."
+            eye_closed = False
+            face_away = False
+            look_away = False
+            status = "Monitoring..."
 
-        if result.multi_face_landmarks:
-            landmarks = result.multi_face_landmarks[0].landmark
+            if result.multi_face_landmarks:
+                landmarks = result.multi_face_landmarks[0].landmark
 
-            left_ear = eye_aspect_ratio(landmarks, LEFT_EYE)
-            right_ear = eye_aspect_ratio(landmarks, RIGHT_EYE)
-            ear = (left_ear + right_ear) / 2
+                left_ear = eye_aspect_ratio(landmarks, LEFT_EYE)
+                right_ear = eye_aspect_ratio(landmarks, RIGHT_EYE)
+                ear = (left_ear + right_ear) / 2
 
-            if ear < 0.20:
-                eye_closed = True
-                if eye_closed_start is None:
-                    eye_closed_start = current_time
-                    eye_closure_count += 1
-                elif current_time - eye_closed_start > EYE_CLOSED_TIME:
-                    status = "ALARM: Eyes Closed!"
+                if ear < 0.20:
+                    eye_closed = True
+                    if eye_closed_start is None:
+                        eye_closed_start = time.time()
+                        eye_closure_count += 1
+                    elif time.time() - eye_closed_start > EYE_CLOSED_TIME:
+                        status = "ALARM: Eyes Closed!"
+                        if alarm_sound:
+                            alarm_sound.play(-1)
+                else:
+                    eye_closed_start = None
+                    if alarm_sound:
+                        alarm_sound.stop()
+
+                yaw, pitch = get_face_direction(landmarks)
+                if abs(yaw) > 0.1 or abs(pitch) > 0.1:
+                    face_away = True
+                    if face_away_start is None:
+                        face_away_start = time.time()
+                    elif time.time() - face_away_start > FACE_AWAY_TIME:
+                        status = "ALARM: Face Away!"
+                        if alarm_sound:
+                            alarm_sound.play(-1)
+                else:
+                    face_away_start = None
+
+                left_gaze_x, _ = get_eye_gaze(landmarks, LEFT_EYE)
+                right_gaze_x, _ = get_eye_gaze(landmarks, RIGHT_EYE)
+                gaze_x = (left_gaze_x + right_gaze_x) / 2
+                if abs(gaze_x - 0.5) > 0.2:
+                    look_away = True
+                    if look_away_start is None:
+                        look_away_start = time.time()
+                        look_away_count += 1
+                    elif time.time() - look_away_start > LOOK_AWAY_TIME:
+                        status = "ALARM: Looking Away!"
+                        if alarm_sound:
+                            alarm_sound.play(-1)
+                else:
+                    look_away_start = None
+
+                if not (eye_closed or face_away or look_away):
+                    attentive_time += 0.1
+
+                focus_score = int((attentive_time / total_time) * 100) if total_time > 0 else 100
+
+                eye_status = "Closed" if eye_closed else "Open"
+                face_status = "Away" if face_away else "Facing Screen"
+                gaze_status = "Away" if look_away else "Center"
+
+                # Emit status update
+                socketio.emit('update', {
+                    'status': status,
+                    'focus_score': focus_score,
+                    'eye_status': eye_status,
+                    'face_status': face_status,
+                    'gaze_status': gaze_status,
+                    'alarm': 'ALARM' in status
+                })
+            else:
+                if monitoring:
+                    status = "ALARM: No Face!"
                     if alarm_sound:
                         alarm_sound.play(-1)
-            else:
-                eye_closed_start = None
-                if alarm_sound:
-                    alarm_sound.stop()
-
-            yaw, pitch = get_face_direction(landmarks)
-            if abs(yaw) > 0.1 or abs(pitch) > 0.1:
-                face_away = True
-                if face_away_start is None:
-                    face_away_start = current_time
-                elif current_time - face_away_start > FACE_AWAY_TIME:
-                    status = "ALARM: Face Away!"
-                    if alarm_sound:
-                        alarm_sound.play(-1)
-            else:
-                face_away_start = None
-
-            left_gaze_x, _ = get_eye_gaze(landmarks, LEFT_EYE)
-            right_gaze_x, _ = get_eye_gaze(landmarks, RIGHT_EYE)
-            gaze_x = (left_gaze_x + right_gaze_x) / 2
-            if abs(gaze_x - 0.5) > 0.2:
-                look_away = True
-                if look_away_start is None:
-                    look_away_start = current_time
-                    look_away_count += 1
-                elif current_time - look_away_start > LOOK_AWAY_TIME:
-                    status = "ALARM: Looking Away!"
-                    if alarm_sound:
-                        alarm_sound.play(-1)
-            else:
-                look_away_start = None
-
-            if not (eye_closed or face_away or look_away):
-                attentive_time += 0.1
+                    socketio.emit('update', {
+                        'status': status,
+                        'focus_score': int((attentive_time / total_time) * 100) if total_time > 0 else 100,
+                        'eye_status': "Unknown",
+                        'face_status': "Not Detected",
+                        'gaze_status': "Unknown",
+                        'alarm': True
+                    })
         else:
-            status = "ALARM: No Face!"
-            if alarm_sound:
-                alarm_sound.play(-1)
-
-        focus_score = int((attentive_time / total_time) * 100) if total_time > 0 else 100
-
-        eye_status = "Closed" if eye_closed else "Open"
-        face_status = "Away" if face_away else "Facing Screen"
-        gaze_status = "Away" if look_away else "Center"
-
-        # Emit status update
-        socketio.emit('update', {
-            'status': status,
-            'focus_score': focus_score,
-            'eye_status': eye_status,
-            'face_status': face_status,
-            'gaze_status': gaze_status,
-            'alarm': 'ALARM' in status
-        })
+            # When not monitoring, show a waiting message
+            cv2.putText(frame, "Click 'Start Monitoring'", (50, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            cv2.putText(frame, "to begin focus tracking", (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
         # Encode frame for web
         ret, buffer = cv2.imencode('.jpg', frame)
@@ -199,10 +213,19 @@ def generate_frames():
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
+        # Small delay to prevent excessive CPU usage
+        time.sleep(0.1)
+
 @socketio.on('start_monitoring')
 def start_monitoring():
-    global monitoring
+    global monitoring, total_time, attentive_time, eye_closed_start, face_away_start, look_away_start
     monitoring = True
+    # Reset timers when starting new monitoring session
+    total_time = 0
+    attentive_time = 0
+    eye_closed_start = None
+    face_away_start = None
+    look_away_start = None
     emit('status', {'monitoring': True})
 
 @socketio.on('stop_monitoring')
@@ -216,6 +239,14 @@ def stop_monitoring():
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/about')
+def about():
+    return render_template('about.html')
+
+@app.route('/contact')
+def contact():
+    return render_template('contact.html')
 
 @app.route('/video_feed')
 def video_feed():
