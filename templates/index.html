@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Guard 👁️</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+            align-items: start;
+        }
+        .video-section {
+            flex: 1;
+        }
+        .controls-section {
+            flex: 1;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status-display {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .status-item {
+            margin: 8px 0;
+            padding: 5px 0;
+        }
+        .alarm {
+            color: #dc3545;
+            font-weight: bold;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.5; }
+        }
+        .focus-score {
+            font-size: 24px;
+            font-weight: bold;
+            color: #28a745;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .video-container {
+            background: black;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+        img {
+            width: 100%;
+            display: block;
+        }
+        .title {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        audio {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <audio id="alarm-audio" loop>
+        <source src="{{ url_for('static', filename='alarm.wav') }}" type="audio/wav">
+    </audio>
+    <h1 class="title">Study Guard 👁️</h1>
+    <div class="container">
+        <div class="video-section">
+            <div class="video-container">
+                <img id="video-feed" src="" alt="Video Feed">
+            </div>
+        </div>
+        <div class="controls-section">
+            <div class="status-display">
+                <div class="status-item">
+                    <strong>Status:</strong> <span id="status">Initializing...</span>
+                </div>
+                <div class="status-item">
+                    <strong>Focus Score:</strong> <span id="focus-score" class="focus-score">100%</span>
+                </div>
+                <div class="status-item">
+                    <strong>Eyes:</strong> <span id="eye-status">Open</span>
+                </div>
+                <div class="status-item">
+                    <strong>Face:</strong> <span id="face-status">Facing Screen</span>
+                </div>
+                <div class="status-item">
+                    <strong>Gaze:</strong> <span id="gaze-status">Center</span>
+                </div>
+            </div>
+            <button id="start-btn">Start Monitoring</button>
+            <button id="stop-btn" disabled>Stop Monitoring</button>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        const videoFeed = document.getElementById('video-feed');
+        const statusEl = document.getElementById('status');
+        const focusScoreEl = document.getElementById('focus-score');
+        const eyeStatusEl = document.getElementById('eye-status');
+        const faceStatusEl = document.getElementById('face-status');
+        const gazeStatusEl = document.getElementById('gaze-status');
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const alarmAudio = document.getElementById('alarm-audio');
+
+        // Update video feed
+        videoFeed.src = '/video_feed';
+
+        // Handle real-time updates
+        socket.on('update', function(data) {
+            statusEl.textContent = data.status;
+            focusScoreEl.textContent = data.focus_score + '%';
+            eyeStatusEl.textContent = data.eye_status;
+            faceStatusEl.textContent = data.face_status;
+            gazeStatusEl.textContent = data.gaze_status;
+
+            // Add alarm styling and sound
+            if (data.alarm) {
+                statusEl.classList.add('alarm');
+                alarmAudio.play().catch(e => console.log('Audio play failed:', e));
+            } else {
+                statusEl.classList.remove('alarm');
+                alarmAudio.pause();
+                alarmAudio.currentTime = 0;
+            }
+        });
+
+        socket.on('status', function(data) {
+            startBtn.disabled = data.monitoring;
+            stopBtn.disabled = !data.monitoring;
+            if (!data.monitoring) {
+                alarmAudio.pause();
+                alarmAudio.currentTime = 0;
+            }
+        });
+
+        startBtn.addEventListener('click', function() {
+            socket.emit('start_monitoring');
+        });
+
+        stopBtn.addEventListener('click', function() {
+            socket.emit('stop_monitoring');
+        });
+    </script>
+</body>
+</html>
