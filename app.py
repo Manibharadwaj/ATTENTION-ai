@@ -73,6 +73,7 @@ total_time = 0
 attentive_time = 0
 eye_closure_count = 0
 look_away_count = 0
+start_time = 0
 
 monitoring = False
 
@@ -218,7 +219,7 @@ def generate_frames():
 
 @socketio.on('start_monitoring')
 def start_monitoring():
-    global monitoring, total_time, attentive_time, eye_closed_start, face_away_start, look_away_start
+    global monitoring, total_time, attentive_time, eye_closed_start, face_away_start, look_away_start, start_time
     monitoring = True
     # Reset timers when starting new monitoring session
     total_time = 0
@@ -226,7 +227,17 @@ def start_monitoring():
     eye_closed_start = None
     face_away_start = None
     look_away_start = None
+    start_time = time.time()  # Reset start time for accurate timing
     emit('status', {'monitoring': True})
+    # Emit initial status with 0% focus score
+    socketio.emit('update', {
+        'status': 'Monitoring...',
+        'focus_score': 0,
+        'eye_status': 'Open',
+        'face_status': 'Facing Screen',
+        'gaze_status': 'Center',
+        'alarm': False
+    })
 
 @socketio.on('stop_monitoring')
 def stop_monitoring():
