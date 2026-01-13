@@ -125,72 +125,104 @@ def generate_frames():
             status = "Monitoring..."
 
             if result.multi_face_landmarks:
-                landmarks = result.multi_face_landmarks[0].landmark
+                # Find the most prominent face (closest to center and largest)
+                best_face = None
+                best_score = -1
 
-                left_ear = eye_aspect_ratio(landmarks, LEFT_EYE)
-                right_ear = eye_aspect_ratio(landmarks, RIGHT_EYE)
-                ear = (left_ear + right_ear) / 2
+                for face_landmarks in result.multi_face_landmarks:
+                    landmarks = face_landmarks.landmark
 
-                if ear < 0.20:
-                    eye_closed = True
-                    if eye_closed_start is None:
-                        eye_closed_start = time.time()
-                        eye_closure_count += 1
-                    elif time.time() - eye_closed_start > EYE_CLOSED_TIME:
-                        status = "ALARM: Eyes Closed!"
+                    # Calculate face center and size
+                    nose = landmarks[1]
+                    left_eye = landmarks[33]
+                    right_eye = landmarks[362]
+
+                    # Face center position
+                    face_center_x = (left_eye.x + right_eye.x) / 2
+                    face_center_y = (left_eye.y + right_eye.y) / 2
+
+                    # Distance from frame center
+                    center_distance = ((face_center_x - 0.5) ** 2 + (face_center_y - 0.5) ** 2) ** 0.5
+
+                    # Face size (approximate using eye distance)
+                    face_size = ((right_eye.x - left_eye.x) ** 2 + (right_eye.y - left_eye.y) ** 2) ** 0.5
+
+                    # Score based on size and centrality (prefer larger, more central faces)
+                    score = face_size / (center_distance + 0.1)  # Add small offset to avoid division by zero
+
+                    if score > best_score:
+                        best_score = score
+                        best_face = landmarks
+
+                # Process the best face
+                if best_face:
+                    landmarks = best_face
+
+                    left_ear = eye_aspect_ratio(landmarks, LEFT_EYE)
+                    right_ear = eye_aspect_ratio(landmarks, RIGHT_EYE)
+                    ear = (left_ear + right_ear) / 2
+
+                    if ear < 0.20:
+                        eye_closed = True
+                        if eye_closed_start is None:
+                            eye_closed_start = time.time()
+                            eye_closure_count += 1
+                        elif time.time() - eye_closed_start > EYE_CLOSED_TIME:
+                            status = "ALARM: Eyes Closed!"
+                            if alarm_sound:
+                                alarm_sound.play(-1)
+                    else:
+                        eye_closed_start = None
                         if alarm_sound:
-                            alarm_sound.play(-1)
-                else:
-                    eye_closed_start = None
-                    if alarm_sound:
-                        alarm_sound.stop()
+                            alarm_sound.stop()
 
-                yaw, pitch = get_face_direction(landmarks)
-                if abs(yaw) > 0.1 or abs(pitch) > 0.1:
-                    face_away = True
-                    if face_away_start is None:
-                        face_away_start = time.time()
-                    elif time.time() - face_away_start > FACE_AWAY_TIME:
-                        status = "ALARM: Face Away!"
-                        if alarm_sound:
-                            alarm_sound.play(-1)
-                else:
-                    face_away_start = None
+                    yaw, pitch = get_face_direction(landmarks)
+                    if abs(yaw) > 0.1 or abs(pitch) > 0.1:
+                        face_away = True
+                        if face_away_start is None:
+                            face_away_start = time.time()
+                        elif time.time() - face_away_start > FACE_AWAY_TIME:
+                            status = "ALARM: Face Away!"
+                            if alarm_sound:
+                                alarm_sound.play(-1)
+                    else:
+                        face_away_start = None
 
-                left_gaze_x, _ = get_eye_gaze(landmarks, LEFT_EYE)
-                right_gaze_x, _ = get_eye_gaze(landmarks, RIGHT_EYE)
-                gaze_x = (left_gaze_x + right_gaze_x) / 2
-                if abs(gaze_x - 0.5) > 0.2:
-                    look_away = True
-                    if look_away_start is None:
-                        look_away_start = time.time()
-                        look_away_count += 1
-                    elif time.time() - look_away_start > LOOK_AWAY_TIME:
-                        status = "ALARM: Looking Away!"
-                        if alarm_sound:
-                            alarm_sound.play(-1)
-                else:
-                    look_away_start = None
+                    left_gaze_x, _ = get_eye_gaze(landmarks, LEFT_EYE)
+                    right_gaze_x, _ = get_eye_gaze(landmarks, RIGHT_EYE)
+                    gaze_x = (left_gaze_x + right_gaze_x) / 2
+                    if abs(gaze_x - 0.5) > 0.2:
+                        look_away = True
+                        if look_away_start is None:
+                            look_away_start = time.time()
+                            look_away_count += 1
+                        elif time.time() - look_away_start > LOOK_AWAY_TIME:
+                            status = "ALARM: Looking Away!"
+                            if alarm_sound:
+                                alarm_sound.play(-1)
+                    else:
+                        look_away_start = None
 
-                if not (eye_closed or face_away or look_away):
-                    attentive_time += 0.1
+                    if not (eye_closed or face_away or look_away):
+                        attentive_time += 0.1
 
-                focus_score = int((attentive_time / total_time) * 100) if total_time > 0 else 100
+                    focus_score = int((attentive_time / total_time) * 100) if total_time > 0 else 100
 
-                eye_status = "Closed" if eye_closed else "Open"
-                face_status = "Away" if face_away else "Facing Screen"
-                gaze_status = "Away" if look_away else "Center"
+                    eye_status = "Closed" if eye_closed else "Open"
+                    face_status = "Away" if face_away else "Facing Screen"
+                    gaze_status = "Away" if look_away else "Center"
 
-                # Emit status update
-                socketio.emit('update', {
-                    'status': status,
-                    'focus_score': focus_score,
-                    'eye_status': eye_status,
-                    'face_status': face_status,
-                    'gaze_status': gaze_status,
-                    'alarm': 'ALARM' in status
-                })
+                    # Emit status update
+                    socketio.emit('update', {
+                        'status': status,
+                        'focus_score': focus_score,
+                        'eye_status': eye_status,
+                        'face_status': face_status,
+                        'gaze_status': gaze_status,
+                        'alarm': 'ALARM' in status
+                    })
             else:
+                # No faces detected
                 if monitoring:
                     status = "ALARM: No Face!"
                     if alarm_sound:
